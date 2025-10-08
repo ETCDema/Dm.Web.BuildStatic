@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Dm.Web.BuildStatic": {
+      "commandName": "Project",
+      "workingDirectory": ".\\"
+    }
+  }
+}

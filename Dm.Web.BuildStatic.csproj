@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<IsPackable>True</IsPackable>
+		<IsTool>True</IsTool>
+		<PackAsTool>True</PackAsTool>
+		<ToolCommandName>Dm.Web.BuildStatic</ToolCommandName>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<Title>🛠️ .NET Pre-build tool for static resources</Title>
+		<Authors>Dema</Authors>
+		<Description>🛠️ .NET Pre-build tool for static resources</Description>
+		<PackageProjectUrl></PackageProjectUrl>
+		<RepositoryUrl>https://github.com/ETCDema/Dm.Web.BuildStatic</RepositoryUrl>
+		<PackageTags>pre-build tool;dotnet tool</PackageTags>
+		<PackageReadmeFile>readme.md</PackageReadmeFile>
+		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+		<VersionPrefix>1.0.1</VersionPrefix>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="TestStatic\**\*.gz" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="NUglify" Version="1.21.17" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Update="readme.md">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
+	  </None>
+	</ItemGroup>
+
+</Project>

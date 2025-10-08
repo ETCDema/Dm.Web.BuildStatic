@@ -1,0 +1,3 @@
+﻿// This is JS
+
+alert('JS, MF!');

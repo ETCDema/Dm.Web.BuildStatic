@@ -1,0 +1,31 @@
+﻿{
+    "use": {
+        "list":  "Dm.Web.BuildStatic.Services.Stages.FilesSource+Builder",
+        "each":  "Dm.Web.BuildStatic.Services.Stages.ForEach+Builder",
+        "copy":  "Dm.Web.BuildStatic.Services.Stages.FileCopy+Builder",
+        "minjs": "Dm.Web.BuildStatic.Services.Stages.MinifyJS+Builder",
+        "gzip":  "Dm.Web.BuildStatic.Services.Stages.GzipStream+Builder"
+    },
+    "pipelines": [
+        {
+            "list": "TestStatic/js/**/*.js",
+            "each": "string",
+            "copy": "{path}.gz",
+            "minjs":  null,
+            "gzip": "Optimal"
+        },
+        {
+            "list": "TestStatic/css/*.css",
+            "each": "string",
+            "copy": "{path}.gz",
+            "gzip": null
+        },
+        {
+            "list": "TestStatic/move-to-js.txt",
+            "each": "string",
+            "copy": "TestStatic/js/moved.js.gz",
+            "minjs":  null,
+            "gzip": null
+        }
+    ]
+}

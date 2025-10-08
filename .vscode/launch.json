@@ -1,0 +1,11 @@
+{
+	"configurations": [
+		{
+			"name": "C#: Dm.Web.BuildStatic",
+			"type": "dotnet",
+			"request": "launch",
+			"projectPath": "${workspaceFolder}\\Dm.Web.BuildStatic.csproj",
+			"launchConfigurationId": "TargetFramework=;Dm.Web.BuildStatic"
+		}
+	]
+}
