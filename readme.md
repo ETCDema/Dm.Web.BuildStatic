@@ -1,4 +1,5 @@
-﻿# 🛠️ .NET Pre-build tool for static resources
+ 
+# 🛠️ .NET Pre-build tool for static resources
 
 ## Install
 
@@ -20,7 +21,7 @@ Dm.Web.BuildStatic # Uses dm.web.build.static.json config by default
 ```
 
 Pre-build step:
-```xml
+``` xml
 <Target Name="BuildStatic" BeforeTargets="PreBuildEvent">
 	<!-- Install tool before use: dotnet tool install --global Dm.Web.BuildStatic -->
 
@@ -35,7 +36,7 @@ Pre-build step:
 
 ## Config format
 
-```json
+``` json
 {
 	"use": {
 		"list":  "Dm.Web.BuildStatic.Services.Stages.FilesSource+Builder",
