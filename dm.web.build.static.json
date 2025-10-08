@@ -4,15 +4,16 @@
         "each":  "Dm.Web.BuildStatic.Services.Stages.ForEach+Builder",
         "copy":  "Dm.Web.BuildStatic.Services.Stages.FileCopy+Builder",
         "minjs": "Dm.Web.BuildStatic.Services.Stages.MinifyJS+Builder",
-        "gzip":  "Dm.Web.BuildStatic.Services.Stages.GzipStream+Builder"
+        "gzip":  "Dm.Web.BuildStatic.Services.Stages.GzipStream+Builder",
+		"sprite":"Dm.Web.BuildStatic.Services.Stages.SVGSprite+Builder"
     },
     "pipelines": [
         {
-            "list": "TestStatic/js/**/*.js",
-            "each": "string",
-            "copy": "{path}.gz",
-            "minjs":  null,
-            "gzip": "Optimal"
+            "list":  "TestStatic/js/**/*.js",
+            "each":  "string",
+            "copy":  "{path}.gz",
+            "minjs": null,
+            "gzip":  "Optimal"
         },
         {
             "list": "TestStatic/css/*.css",
@@ -21,11 +22,16 @@
             "gzip": null
         },
         {
-            "list": "TestStatic/move-to-js.txt",
-            "each": "string",
-            "copy": "TestStatic/js/moved.js.gz",
-            "minjs":  null,
-            "gzip": null
+            "list":  "TestStatic/move-to-js.txt",
+            "each":  "string",
+            "copy":  "TestStatic/js/moved.js.gz",
+            "minjs": null,
+            "gzip":  null
+        },
+        {
+            "list":   "TestStatic/img/oauth2-icons/*.svg",
+			"sprite": "TestStatic/img/oauth2-icons.svg.gz",
+			"gzip":   null
         }
     ]
 }

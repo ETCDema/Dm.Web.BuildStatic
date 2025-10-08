@@ -88,8 +88,8 @@ internal class FileCopy(Func<string, string> dstNameFx) : IStage, IFinalStage
 	{
 		if (!File.Exists(dstName)) return false;
 
-		var srcMod          = File.GetLastWriteTimeUtc(srcName);
-		var dstMod          = File.GetLastWriteTimeUtc(dstName);
+		var srcMod          	= File.GetLastWriteTimeUtc(srcName);
+		var dstMod          	= File.GetLastWriteTimeUtc(dstName);
 
 		return srcMod<dstMod;
 	}
