@@ -18,7 +18,7 @@
 		<PackageTags>pre-build tool;dotnet tool</PackageTags>
 		<PackageReadmeFile>readme.md</PackageReadmeFile>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
-		<VersionPrefix>1.0.1</VersionPrefix>
+		<VersionPrefix>1.0.2</VersionPrefix>
 	</PropertyGroup>
 
 	<ItemGroup>

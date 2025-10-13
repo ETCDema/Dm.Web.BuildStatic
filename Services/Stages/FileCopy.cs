@@ -29,11 +29,19 @@ internal class FileCopy(Func<string, string> dstNameFx) : IStage, IFinalStage
 			var ext				= cfg.GetString() ?? throw new Exception("Destination file name not specified");
 			string nameFx(string srcName)
 			{
-				return ext.Replace("{path}", srcName)
-						  .Replace("{file}", Path.GetFileName(srcName));
+				return ext.Replace("{path}",		srcName)
+						  .Replace("{path-no-ext}", _pathNoExt(srcName))
+						  .Replace("{file}",		Path.GetFileName(srcName))
+						  .Replace("{file-no-ext}", Path.GetFileNameWithoutExtension(srcName));
 			}
 
 			dst.Add(new FileCopy(nameFx));
+		}
+
+		private string _pathNoExt(string srcName)
+		{
+			var ext				= Path.GetExtension(srcName);
+			return string.IsNullOrEmpty(ext) ? srcName : srcName.Substring(0, srcName.Length-ext.Length);
 		}
 	}
 
