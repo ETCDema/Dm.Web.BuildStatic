@@ -52,8 +52,6 @@ internal class Program
 				pipeline.Run();
 			}
 
-			Console.ReadKey();
-
 			// Отпускаем файл...
 			reader.Close();
 		} catch (IOException ex)
