@@ -52,11 +52,13 @@ internal class Program
 				pipeline.Run();
 			}
 
+			Console.ReadKey();
+
 			// Отпускаем файл...
 			reader.Close();
 		} catch (IOException ex)
 		{
-			if (tryReadConfig && ex.HResult==-2147024864 /* == 0x80070020 Sharing violation */)
+			if (tryReadConfig && (ex.HResult==-2147024864 /* == Windows: 0x80070020 Sharing violation */ || ex.HResult==11 /* Linux: The process cannot access the file ... because it is being used by another process. */))
 				Console.WriteLine("⚠️ Config locked by another process - exit");
 			else
 				throw;
