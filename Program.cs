@@ -111,7 +111,7 @@ internal class Program
 				return;
 			} catch (IOException ex)
 			{
-				if (ex.HResult!=-2147024864 /* != 0x80070020 Sharing violation */)
+				if (ex.HResult!=-2147024864 /* Windows sharing violation */ && ex.HResult!=11 /* Linux sharing violation */)
 					throw;
 			}
 		}
