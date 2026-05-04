@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 using Dm.Web.BuildStatic.Services;
 using Dm.Web.BuildStatic.Services.Core;
@@ -11,13 +11,12 @@ internal class Program
 
 	static int Main(string[] args)
 	{
-		Console.WriteLine("🛠️ .NET Pre-build tool for static resources");
-
 		var cfgName             = args.Length>0 ? args[0] : null;
 		if (string.IsNullOrEmpty(cfgName)) cfgName = _DEFAULT_CFG_NAME;
 
 		if (!File.Exists(cfgName))
 		{
+			Console.WriteLine("🛠️ .NET Pre-build tool for static resources");
 			Console.WriteLine($"❌ Config file {cfgName} not found.");
 			Console.WriteLine("Usage: Dm.Web.BuildStatic [config.json]");
 			Console.WriteLine($"By default try using {_DEFAULT_CFG_NAME} config from current folder");
@@ -32,6 +31,8 @@ internal class Program
 			using var reader    = new FileStream(cfgName, FileMode.Open, FileAccess.Read, FileShare.None);
 			tryReadConfig       = false;
 			var config          = JsonDocument.Parse(reader).RootElement;
+
+			Console.WriteLine($"🛠️ Pre-build static resources using config file {cfgName}...");
 
 			var builders        = new Dictionary<string, IStageBuilder>();
 			var pipelines       = new List<Pipeline>();
@@ -52,12 +53,13 @@ internal class Program
 				pipeline.Run();
 			}
 
+			Console.WriteLine($"✔️ Done");
 			// Отпускаем файл...
 			reader.Close();
 		} catch (IOException ex)
 		{
 			if (tryReadConfig && (ex.HResult==-2147024864 /* == Windows: 0x80070020 Sharing violation */ || ex.HResult==11 /* Linux: The process cannot access the file ... because it is being used by another process. */))
-				Console.WriteLine("⚠️ Config locked by another process - exit");
+				_waitForCompletion(cfgName);
 			else
 				throw;
 		}
@@ -90,6 +92,28 @@ internal class Program
 		{
 			var builder         = builders[prop.Name];
 			builder.Build(prop.Value, pipeline);
+		}
+	}
+
+	private static void _waitForCompletion(string cfgName)
+	{
+		Console.WriteLine($"⚠️ Config {cfgName} locked by another process - waiting for completion...");
+		// Ожидать окончания блокировки файла т.к. он готовит нужное нам
+
+		while (true)
+		{
+			Thread.Sleep(100);
+			try
+			{
+				using var reader= new FileStream(cfgName, FileMode.Open, FileAccess.Read, FileShare.None);
+				reader.Close();
+				Console.WriteLine($"✔️ Done");
+				return;
+			} catch (IOException ex)
+			{
+				if (ex.HResult!=-2147024864 /* != 0x80070020 Sharing violation */)
+					throw;
+			}
 		}
 	}
 }
