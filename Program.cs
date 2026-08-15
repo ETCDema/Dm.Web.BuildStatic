@@ -29,7 +29,6 @@ internal class Program
 		try
 		{
 			using var reader    = new FileStream(cfgName, FileMode.Open, FileAccess.Read, FileShare.None);
-			tryReadConfig       = false;
 			var config          = JsonDocument.Parse(reader).RootElement;
 
 			Console.WriteLine($"🛠️ Pre-build static resources using config file {cfgName}...");
@@ -47,6 +46,8 @@ internal class Program
 				}
 			}
 
+			tryReadConfig       = false;
+
 			// Запускаем конвейеры последовательно
 			foreach (var pipeline in pipelines)
 			{
@@ -54,6 +55,7 @@ internal class Program
 			}
 
 			Console.WriteLine($"✔️ Done");
+
 			// Отпускаем файл...
 			reader.Close();
 		} catch (IOException ex)
@@ -61,7 +63,10 @@ internal class Program
 			if (tryReadConfig && (ex.HResult==-2147024864 /* == Windows: 0x80070020 Sharing violation */ || ex.HResult==11 /* Linux: The process cannot access the file ... because it is being used by another process. */))
 				_waitForCompletion(cfgName);
 			else
+			{
+				Console.WriteLine($"HResult: {ex.HResult}");
 				throw;
+			}
 		}
 
 		return 0;
