@@ -1,5 +1,5 @@
 ﻿{
-    "parallel": false,
+    "parallel": true,
     "use": {
         "list":     "Dm.Web.BuildStatic.Services.Stages.FilesSource",
         "eachFile": "Dm.Web.BuildStatic.Services.Stages.EachFileCopy",

@@ -1,14 +1,20 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 using Dm.Web.BuildStatic.Services;
-using Dm.Web.BuildStatic.Services.Core;
 
 namespace Dm.Web.BuildStatic;
 
 internal class Program
 {
 	private static readonly string _DEFAULT_CFG_NAME	= "dm.web.build.static.json";
+
+	private static readonly int _NO_CONFIG				= 1;
+	private static readonly int _ME_FAIL				= 2;
+	private static readonly int _OTHER_FAIL				= 3;
+	private static readonly int _CFG_SHARING_VIOLATION	= 4;
 
 	private static int _returnCode		= 0;
 
@@ -23,9 +29,69 @@ internal class Program
 			Console.WriteLine($"❌ Config file {cfgName} not found.");
 			Console.WriteLine("Usage: Dm.Web.BuildStatic [config.json]");
 			Console.WriteLine($"By default try using {_DEFAULT_CFG_NAME} config from current folder");
-			return 1;
+			return _NO_CONFIG;
 		}
 
+		// Один именованный Mutex на каждый уникальный путь конфига.
+		using var mutex			= new Mutex(initiallyOwned: false, name: _buildMutexName(cfgName));
+		bool doWork             = false;
+		bool acquired			= false;
+
+		try
+		{
+			// Сначала пробуем без ожидания — вдруг мы первые
+			try
+			{
+				acquired		= mutex.WaitOne(TimeSpan.Zero);
+				doWork          = acquired;
+			} catch (AbandonedMutexException)
+			{
+				// прошлый владелец умер — мьютекс теперь наш
+				acquired        = true;
+				Console.WriteLine("❌ Another process FAILED.");
+				return _OTHER_FAIL;
+			}
+
+			if (!acquired)
+			{
+				Console.WriteLine($"⚠️ Config {cfgName} processed by another process - waiting for completion...");
+				try
+				{
+					// блокируемся до освобождения
+					mutex.WaitOne();
+					acquired	= true;
+				} catch (AbandonedMutexException)
+				{
+					acquired	= true;
+					Console.WriteLine("❌ Another process FAILED.");
+					return _OTHER_FAIL;
+				}
+			}
+
+			return doWork ? _run(cfgName) : _returnCode;
+		} finally
+		{
+			if (acquired)
+			{
+				try { mutex.ReleaseMutex(); } catch { /* уже отпущен — ничего не делаем */ }
+			}
+		}
+	}
+
+	private static string _buildMutexName(string cfgName)
+	{
+		// Абсолютный путь — чтобы разные относительные пути к одному файлу
+		// (./config.json и ../app/config.json) давали одно имя.
+		var fullPath			= Path.GetFullPath(cfgName);
+		var hash				= Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fullPath)));
+
+		// "Global\" — только Windows (терминальные сессии). На Linux префикс не поддерживается.
+		var prefix				= OperatingSystem.IsWindows() ? "Global\\" : "";
+		return $"{prefix}DmWeb.BuildStatic.{hash}";
+	}
+
+	private static int _run(string cfgName)
+	{
 		// Читаем конфигурацию: нам нужны сначало генераторы этапов а потом конвейеры, при построении конвейеров используются генераторы этапов.
 		// Блокируем файл для исключения конкурирующих обработок
 		var tryReadConfig       = true;
@@ -75,13 +141,17 @@ internal class Program
 				Console.WriteLine($"✔️ Done {timer.Elapsed}");
 			}
 
+			//Console.ReadKey();
+
 			// Отпускаем файл...
 			reader.Close();
 		} catch (IOException ex)
 		{
 			if (tryReadConfig && (ex.HResult==-2147024864 /* == Windows: 0x80070020 Sharing violation */ || ex.HResult==11 /* Linux: The process cannot access the file ... because it is being used by another process. */))
-				_waitForCompletion(cfgName);
-			else
+			{
+				Console.WriteLine($"❌ Config {ex.HResult} sharing violation");
+				_returnCode     = _CFG_SHARING_VIOLATION;
+			} else
 			{
 				Console.WriteLine($"❌ HResult: {ex.HResult}");
 				throw;
@@ -99,7 +169,7 @@ internal class Program
 		} catch (Exception ex)
 		{
 			Console.WriteLine($"🛑 Pipeline {pipeline.ID} FAIL: {ex.Message}");
-			Interlocked.CompareExchange(ref _returnCode, 2, 0);
+			Interlocked.CompareExchange(ref _returnCode, _ME_FAIL, 0);
 		}
 	}
 
@@ -109,28 +179,6 @@ internal class Program
 		foreach (var item in value.EnumerateArray())
 		{
 			pipelines.Add(new Pipeline($"Main[{i++}]", null, item.EnumerateObject(), builders));
-		}
-	}
-
-	private static void _waitForCompletion(string cfgName)
-	{
-		Console.WriteLine($"⚠️ Config {cfgName} locked by another process - waiting for completion...");
-		// Ожидать окончания блокировки файла т.к. он готовит нужное нам
-
-		while (true)
-		{
-			Thread.Sleep(100);
-			try
-			{
-				using var reader= new FileStream(cfgName, FileMode.Open, FileAccess.Read, FileShare.None);
-				reader.Close();
-				Console.WriteLine($"✔️ Done");
-				return;
-			} catch (IOException ex)
-			{
-				if (ex.HResult!=-2147024864 /* Windows sharing violation */ && ex.HResult!=11 /* Linux sharing violation */)
-					throw;
-			}
 		}
 	}
 }
