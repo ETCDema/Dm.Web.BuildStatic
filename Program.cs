@@ -1,8 +1,10 @@
 using System.Diagnostics;
+using System.Net.NetworkInformation;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
+using Dm.Web.BuildStatic.Models;
 using Dm.Web.BuildStatic.Services;
 
 namespace Dm.Web.BuildStatic;
@@ -11,12 +13,7 @@ internal class Program
 {
 	private static readonly string _DEFAULT_CFG_NAME	= "dm.web.build.static.json";
 
-	private static readonly int _NO_CONFIG				= 1;
-	private static readonly int _ME_FAIL				= 2;
-	private static readonly int _OTHER_FAIL				= 3;
-	private static readonly int _CFG_SHARING_VIOLATION	= 4;
-
-	private static int _returnCode		= 0;
+	private static StateCodes _returnCode		= StateCodes.Ok;
 
 	static int Main(string[] args)
 	{
@@ -29,27 +26,31 @@ internal class Program
 			Console.WriteLine($"❌ Config file {cfgName} not found.");
 			Console.WriteLine("Usage: Dm.Web.BuildStatic [config.json]");
 			Console.WriteLine($"By default try using {_DEFAULT_CFG_NAME} config from current folder");
-			return _NO_CONFIG;
+			return (int)StateCodes.NoConfig;
 		}
 
+		var cfgFullPath			= Path.GetFullPath(cfgName);
+		var cfgHash             = _buildCfgHash(cfgFullPath);
+		var statusPath          = _statusPath(cfgHash);
+
 		// Один именованный Mutex на каждый уникальный путь конфига.
-		using var mutex			= new Mutex(initiallyOwned: false, name: _buildMutexName(cfgName));
-		bool doWork             = false;
-		bool acquired			= false;
+		using var mutex			= new Mutex(initiallyOwned: false, name: _buildMutexName(cfgHash));
+		var doWork				= false;
+		var acquired			= false;
+		var abandoned			= false;
 
 		try
 		{
 			// Сначала пробуем без ожидания — вдруг мы первые
 			try
 			{
-				acquired		= mutex.WaitOne(TimeSpan.Zero);
+				acquired        = mutex.WaitOne(TimeSpan.Zero);
 				doWork          = acquired;
 			} catch (AbandonedMutexException)
 			{
 				// прошлый владелец умер — мьютекс теперь наш
 				acquired        = true;
-				Console.WriteLine("❌ Another process FAILED.");
-				return _OTHER_FAIL;
+				abandoned		= true;
 			}
 
 			if (!acquired)
@@ -59,16 +60,48 @@ internal class Program
 				{
 					// блокируемся до освобождения
 					mutex.WaitOne();
-					acquired	= true;
+					acquired    = true;
 				} catch (AbandonedMutexException)
 				{
-					acquired	= true;
-					Console.WriteLine("❌ Another process FAILED.");
-					return _OTHER_FAIL;
+					acquired    = true;
+					abandoned   = true;
 				}
 			}
 
-			return doWork ? _run(cfgName) : _returnCode;
+			if (doWork)
+			{
+				try
+				{
+					_writeStatus(statusPath, StateCodes.Running);
+					var code	= StateCodes.MeFail;
+					try
+					{
+						code	= _run(cfgName);
+					} finally
+					{
+						_writeStatus(statusPath, code);
+					}
+					return (int)code;
+				} catch
+				{
+					// _run бросил необработанное — статус StateCodes.MeFail уже записан,
+					// мьютекс будет отпущен в finally.
+					throw;
+				}
+			}
+			
+			var state			= abandoned ? StateCodes.Abandoned : _readStatus(statusPath);
+
+			if (state==StateCodes.Ok)
+			{
+				Console.WriteLine($"✔️ Other process done.");
+				return (int)StateCodes.Ok;
+			} else
+			{
+				Console.WriteLine($"❌ Another process FAIL: {state?.ToString() ?? "-NO RESULT-"}.");
+				return (int)StateCodes.OtherFail;
+			}
+
 		} finally
 		{
 			if (acquired)
@@ -78,19 +111,38 @@ internal class Program
 		}
 	}
 
-	private static string _buildMutexName(string cfgName)
+	private static string _buildCfgHash(string cfgFullPath)
 	{
-		// Абсолютный путь — чтобы разные относительные пути к одному файлу
-		// (./config.json и ../app/config.json) давали одно имя.
-		var fullPath			= Path.GetFullPath(cfgName);
-		var hash				= Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fullPath)));
-
-		// "Global\" — только Windows (терминальные сессии). На Linux префикс не поддерживается.
-		var prefix				= OperatingSystem.IsWindows() ? "Global\\" : "";
-		return $"{prefix}DmWeb.BuildStatic.{hash}";
+		return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(cfgFullPath)));
 	}
 
-	private static int _run(string cfgName)
+	private static string _buildMutexName(string hash)
+	{
+		// "Global\" — только Windows (терминальные сессии). На Linux префикс не поддерживается.
+		var prefix				= OperatingSystem.IsWindows() ? "Global\\" : "";
+		return $"{prefix}Dm.Web.BuildStatic.{hash}";
+	}
+
+	private static string _statusPath(string hash)
+	{
+		var dir					= Path.Combine(Path.GetTempPath(), "Dm.Web.BuildStatic");
+		Directory.CreateDirectory(dir);
+		return Path.Combine(dir, hash + ".status");
+	}
+
+	private static void _writeStatus(string path, StateCodes state)
+	{
+		var tmp					= $"{path}.tmp.{Environment.ProcessId}";
+		File.WriteAllText(tmp, state.ToString());
+		File.Move(tmp, path, overwrite: true);					// атомарная замена
+	}
+
+	private static StateCodes? _readStatus(string path)
+	{
+		try { return Enum.Parse<StateCodes>(File.ReadAllText(path)); } catch { return null; }
+	}
+
+	private static StateCodes _run(string cfgName)
 	{
 		// Читаем конфигурацию: нам нужны сначало генераторы этапов а потом конвейеры, при построении конвейеров используются генераторы этапов.
 		// Блокируем файл для исключения конкурирующих обработок
@@ -142,6 +194,7 @@ internal class Program
 			}
 
 			//Console.ReadKey();
+			//throw new Exception("Test");
 
 			// Отпускаем файл...
 			reader.Close();
@@ -150,7 +203,7 @@ internal class Program
 			if (tryReadConfig && (ex.HResult==-2147024864 /* == Windows: 0x80070020 Sharing violation */ || ex.HResult==11 /* Linux: The process cannot access the file ... because it is being used by another process. */))
 			{
 				Console.WriteLine($"❌ Config {ex.HResult} sharing violation");
-				_returnCode     = _CFG_SHARING_VIOLATION;
+				_returnCode     = StateCodes.SharingViolation;
 			} else
 			{
 				Console.WriteLine($"❌ HResult: {ex.HResult}");
@@ -169,7 +222,7 @@ internal class Program
 		} catch (Exception ex)
 		{
 			Console.WriteLine($"🛑 Pipeline {pipeline.ID} FAIL: {ex.Message}");
-			Interlocked.CompareExchange(ref _returnCode, _ME_FAIL, 0);
+			Interlocked.CompareExchange(ref _returnCode, StateCodes.MeFail, StateCodes.Ok);
 		}
 	}
 
