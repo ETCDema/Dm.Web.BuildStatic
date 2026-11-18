@@ -19,7 +19,7 @@ namespace Dm.Web.BuildStatic.Services.Stages
 			/// </summary>
 			/// <param name="cfg">Строка - уровень сжатия, возможные значения см. тут <see cref="CompressionLevel"/>. Если не указан, то используется <see cref="CompressionLevel.Optimal"/>.</param>
 			/// <param name="dst">Создаваемый конвейер</param>
-			public void Build(JsonElement cfg, Pipeline dst)
+			public void Build(JsonElement cfg, PipelineBuilder dst)
 			{
 				var level       = cfg.GetString();
 				dst.Add(new GzipStream(string.IsNullOrEmpty(level) ? CompressionLevel.Optimal : Enum.Parse<CompressionLevel>(level)));
@@ -37,7 +37,7 @@ namespace Dm.Web.BuildStatic.Services.Stages
 			using var gzip		= new GZipStream(streams.Out, level);
 			streams.In.CopyTo(gzip);
 
-			Console.WriteLine($"✅ {streams.InName} -> {streams.OutName}");
+			Console.WriteLine($"✅ Gzip {streams.InName} -> {streams.OutName}");
 		}
 
 		/// <inheritdoc/>
@@ -47,8 +47,17 @@ namespace Dm.Web.BuildStatic.Services.Stages
 		/// <inheritdoc/>
 		void IStage.Run(object param, Action<object> next)
 		{
-			Finalize(param);
-			next(param);
+			var streams         = (InOutStreams)param;
+			using var gzip      = new GZipStream(streams.Out, level);
+
+			Console.WriteLine($"✅ Out {streams.OutName} is GZIP");
+			next(new InOutStreams
+			{
+				In				= streams.In,
+				InName			= streams.InName,
+				Out				= gzip,
+				OutName			= streams.OutName,
+			});
 		}
 	}
 }

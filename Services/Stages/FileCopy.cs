@@ -9,8 +9,8 @@ namespace Dm.Web.BuildStatic.Services.Stages;
 /// Копирование из существующего файла в новый. Если новый файл существует и исходный файл старше нового копирование выполняться не будет.
 /// </summary>
 /// <remarks>Если этап последний, то он просто копирует содержимое, если нет - открывает и передает потоки следующему этапу в <see cref="InOutStreams"/>.</remarks>
-/// <param name="dstNameFx">Генератор имени нового файла</param>
-internal class FileCopy(Func<string, string> dstNameFx) : IStage, IFinalStage
+/// <param name="nameTemplate">Шаблон имени нового файла</param>
+internal class FileCopy(string nameTemplate, Action<object>? fx) : IStage, IFinalStage
 {
 	/// <summary>
 	/// Создать этап копирования. Параметр конфигурации - шаблон имени нового файла, может содержать:
@@ -24,66 +24,107 @@ internal class FileCopy(Func<string, string> dstNameFx) : IStage, IFinalStage
 		/// <inheritdoc cref="Builder"/>
 		/// <param name="cfg">Строка - шаблон имени нового файла</param>
 		/// <param name="dst">Создаваемый конвейер</param>
-		public void Build(JsonElement cfg, Pipeline dst)
+		public void Build(JsonElement cfg, PipelineBuilder dst)
 		{
-			var ext				= cfg.GetString() ?? throw new Exception("Destination file name not specified");
-			string nameFx(string srcName)
+			var nameTemplate    = default(string);
+			var nestedBuilder   = default(PipelineBuilder);
+
+			foreach (var prop in cfg.EnumerateObject())
 			{
-				return ext.Replace("{path}",		srcName)
-						  .Replace("{path-no-ext}", _pathNoExt(srcName))
-						  .Replace("{file}",		Path.GetFileName(srcName))
-						  .Replace("{file-no-ext}", Path.GetFileNameWithoutExtension(srcName));
+				var propName    = prop.Name;
+
+				if (propName=="@dst")
+				{
+					nameTemplate= prop.Value.GetString();
+				} else
+				{
+					var builder = dst.TryGetBuilder(propName)
+								?? throw new Exception($"Builder {propName} not found");
+
+					nestedBuilder       ??= new PipelineBuilder(typeof(InOutStreams), dst.TryGetBuilder);
+					builder.Build(prop.Value, nestedBuilder);
+				}
 			}
 
-			dst.Add(new FileCopy(nameFx));
+			if (string.IsNullOrEmpty(nameTemplate)) throw new Exception("Destination file name not specified");
+
+			dst.Add(Build(nameTemplate, nestedBuilder?.Build()));
 		}
 
-		private string _pathNoExt(string srcName)
+		protected virtual FileCopy Build(string nameTemplate, Action<object>? fx)
 		{
-			var ext				= Path.GetExtension(srcName);
-			return string.IsNullOrEmpty(ext) ? srcName : srcName.Substring(0, srcName.Length-ext.Length);
+			return new FileCopy(nameTemplate, fx);
 		}
 	}
 
 	/// <inheritdoc/>
-	public Type ParamType	=> typeof(string);
+	public virtual Type ParamType		=> typeof(string);
 
 	/// <inheritdoc/>
-	public Type ResultType	=> typeof(InOutStreams);
+	public virtual Type ResultType		=> typeof(string);
 
 	/// <remarks>Открывает потоки и передает следующему этапу</remarks>
 	/// <param name="param">Строка - имя исходного файла</param>
 	/// <inheritdoc/>
-	public void Run(object param, Action<object> next)
+	public virtual void Run(object param, Action<object> next)
 	{
-		var srcName				= (string)param;
-		var dstName				= dstNameFx(srcName);
+		var srcName             = (string)param;
+		var dstName             = DstName(srcName);
+		if (CopyFile(srcName, dstName)) next(dstName);
+	}
 
+	protected string DstName(string srcName)
+	{
+		return nameTemplate.Replace("{path}", srcName)
+						   .Replace("{path-no-ext}", _pathNoExt(srcName))
+						   .Replace("{file}", Path.GetFileName(srcName))
+						   .Replace("{file-no-ext}", Path.GetFileNameWithoutExtension(srcName));
+	}
+
+	protected bool CopyFile(string srcName, string dstName)
+	{
 		if (dstName==srcName) throw new Exception($"Cant't replace file {srcName}, diffirent file name required");
 
 		if (string.IsNullOrEmpty(dstName) || _maySkip(srcName, dstName))
 		{
 			Console.WriteLine($"⏭️ {srcName} SKIPPED");
-			return;
+			return false;
+		}
+		using var input         = File.OpenRead(srcName);
+		using var output		= File.Create(dstName);
+		if (fx!=null)
+		{
+			fx(new InOutStreams
+			{
+				In              = input,
+				InName          = input.Name,
+				Out             = output,
+				OutName         = output.Name
+			});
+		} else
+		{
+			input.CopyTo(output);
 		}
 
-		using var input			= File.OpenRead(srcName);
-		using var output		= File.Create(dstName);
-		next(new InOutStreams
-		{
-			In					= input,
-			InName				= input.Name,
-			Out					= output,
-			OutName				= output.Name
-		});
+		output.Close();
+		input.Close();
+		return true;
 	}
 
 	/// <remarks>Открывает потоки и копирует содержимое без изменений</remarks>
 	/// <param name="param">Строка - имя исходного файла</param>
 	/// <inheritdoc/>
-	public void Finalize(object param)
+	public virtual void Finalize(object param)
 	{
-		Run(param, _copyStream);
+		var srcName             = (string)param;
+		var dstName             = DstName(srcName);
+		CopyFile(srcName, dstName);
+	}
+
+	private static string _pathNoExt(string srcName)
+	{
+		var ext					= Path.GetExtension(srcName);
+		return string.IsNullOrEmpty(ext) ? srcName : srcName[..^ext.Length];
 	}
 
 	/// <summary>
@@ -100,11 +141,5 @@ internal class FileCopy(Func<string, string> dstNameFx) : IStage, IFinalStage
 		var dstMod          	= File.GetLastWriteTimeUtc(dstName);
 
 		return srcMod<dstMod;
-	}
-
-	private void _copyStream(object param)
-	{
-		var streams         = (InOutStreams)param;
-		streams.In.CopyTo(streams.Out);
 	}
 }

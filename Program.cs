@@ -34,25 +34,28 @@ internal class Program
 			Console.WriteLine($"🛠️ Pre-build static resources using config file {cfgName}...");
 
 			var builders        = new Dictionary<string, IStageBuilder>();
-			var pipelines       = new List<Pipeline>();
+			var pipelines       = new List<PipelineBuilder>();
+
+			IStageBuilder? tryGetBuilder(string name)
+			{
+				return builders.TryGetValue(name, out var builder) ? builder : null;
+			}
 
 			foreach (var prop in config.EnumerateObject())
 			{
 				switch (prop.Name)
 				{
 					case "use": _readBuilders(prop.Value, builders); break;
-					case "pipelines": _readPipelines(prop.Value, builders, pipelines); break;
+					case "pipelines": _readPipelines(prop.Value, builders, pipelines, tryGetBuilder); break;
 					default: throw new NotSupportedException($"Property {prop.Name} at root not supported");
 				}
 			}
 
 			tryReadConfig       = false;
 
-			// Запускаем конвейеры последовательно
-			foreach (var pipeline in pipelines)
-			{
-				pipeline.Run();
-			}
+			// Запускаем конвейеры параллельно
+			var pipelineFxs     = pipelines.Select(p => p.Build());
+			Parallel.ForEach(pipelineFxs, fx => fx(null!));
 
 			Console.WriteLine($"✔️ Done");
 
@@ -81,17 +84,17 @@ internal class Program
 		}
 	}
 
-	private static void _readPipelines(JsonElement value, Dictionary<string, IStageBuilder> builders, List<Pipeline> pipelines)
+	private static void _readPipelines(JsonElement value, Dictionary<string, IStageBuilder> builders, List<PipelineBuilder> pipelines, Func<string, IStageBuilder?> tryGetBuilder)
 	{
 		foreach (var item in value.EnumerateArray())
 		{
-			var pipeline        = new Pipeline();
+			var pipeline        = new PipelineBuilder(null, tryGetBuilder);
 			_readPipeline(item, builders, pipeline);
 			pipelines.Add(pipeline);
 		}
 	}
 
-	private static void _readPipeline(JsonElement cfg, Dictionary<string, IStageBuilder> builders, Pipeline pipeline)
+	private static void _readPipeline(JsonElement cfg, Dictionary<string, IStageBuilder> builders, PipelineBuilder pipeline)
 	{
 		foreach (var prop in cfg.EnumerateObject())
 		{

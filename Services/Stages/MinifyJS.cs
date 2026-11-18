@@ -20,7 +20,7 @@ internal class MinifyJS : IFinalStage, IStage
 		/// </summary>
 		/// <param name="cfg">Игнорируется.</param>
 		/// <param name="dst">Создаваемый конвейер</param>
-		public void Build(JsonElement cfg, Pipeline dst)
+		public void Build(JsonElement cfg, PipelineBuilder dst)
 		{
 			dst.Add(new MinifyJS());
 		}
@@ -71,7 +71,11 @@ internal class MinifyJS : IFinalStage, IStage
 
 	private static bool _isMinified(string name)
 	{
-		return name!=null && name.EndsWith(".min.js", StringComparison.OrdinalIgnoreCase);
+		if (string.IsNullOrEmpty(name)) return false;
+
+		var last                = name.LastIndexOf('.');
+		var minExt              = 5<last ? string.Concat(".min", name.AsSpan(last)) : null;
+		return minExt!=null && name.EndsWith(minExt, StringComparison.OrdinalIgnoreCase);
 	}
 
 	private void _minify(Stream src, Stream dst)

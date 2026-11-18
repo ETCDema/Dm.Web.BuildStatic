@@ -12,5 +12,5 @@ internal interface IStageBuilder
 	/// </summary>
 	/// <param name="cfg">Настройки этапа</param>
 	/// <param name="dst">Создаваемый конвейер</param>
-	void Build(JsonElement cfg, Pipeline dst);
+	void Build(JsonElement cfg, PipelineBuilder dst);
 }

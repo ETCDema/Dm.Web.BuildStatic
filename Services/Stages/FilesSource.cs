@@ -18,7 +18,7 @@ internal class FilesSource(string directory, string pattern, bool recursive) : I
 		/// <inheritdoc cref="Builder"/>
 		/// <param name="cfg">Строка - относительный/абсолютный путь к директории с файлами + паттерн фильтрации файлов</param>
 		/// <param name="dst">Создаваемый конвейер</param>
-		public void Build(JsonElement cfg, Pipeline dst)
+		public void Build(JsonElement cfg, PipelineBuilder dst)
 		{
 			var segments		= cfg.GetString()?.Split(Path.PathSeparator, Path.AltDirectorySeparatorChar);
 			if (segments==null || segments.Length==0) throw new ArgumentException("Empty path+pattern for FilesSource");

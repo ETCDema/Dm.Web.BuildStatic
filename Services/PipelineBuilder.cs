@@ -5,21 +5,28 @@ namespace Dm.Web.BuildStatic.Services
 	/// <summary>
 	/// Конвейер подготовки статических ресурсов
 	/// </summary>
-	internal class Pipeline
+	internal class PipelineBuilder(Type? paramType, Func<string, IStageBuilder?> tryGetBuilder)
 	{
-		private IStartStage _start				= default!;
+		private IStartStage? _start;
 		private readonly List<IStage> _stages	= [];
 		private IFinalStage? _final;
-		private Type? _resultType;
+		private Type? _resultType		= paramType;
+
+		public IStageBuilder? TryGetBuilder(string name)
+		{
+			return tryGetBuilder(name);
+		}
 
 		/// <summary>
-		/// Добавить этап, в конвейере должен быть один начальный и один конечный этап а так же несколько промежуточных этапов.
+		/// Добавить этап, в конвейере может быть один начальный и один конечный этап а так же несколько промежуточных этапов.
 		/// </summary>
 		/// <param name="stage"></param>
 		/// <exception cref="Exception"></exception>
 		public void Add(IPipelineStage stage)
 		{
-			if (_start==null)
+			var needStartStage  = paramType==null;
+
+			if (needStartStage && _start==null)
 			{
 				if (stage is not IStartStage start) throw new Exception("Start stage is empty - add start pipeline stage first");
 
@@ -43,10 +50,10 @@ namespace Dm.Web.BuildStatic.Services
 				_resultType		= middle.ResultType;
 			} else if (stage is IStartStage)
 			{
-				throw new Exception("Pipeline has start stage");
+				throw new Exception(needStartStage ? "Pipeline has start stage" : "Pipeline not supported start stage");
 			} else
 			{
-				throw new Exception("Stage mast be IStartStage/IStage/IFinalStage");
+				throw new Exception(needStartStage ? "Stage mast be IStartStage/IStage/IFinalStage" : "Stage mast be IStage/IFinalStage");
 			}
 		}
 
@@ -65,17 +72,16 @@ namespace Dm.Web.BuildStatic.Services
 		/// Выполнить этапы конвейера
 		/// </summary>
 		/// <exception cref="Exception"></exception>
-		public void Run()
+		internal Action<object> Build()
 		{
+			var needStartStage  = paramType==null;
 			var start			= _start
-								?? this as IStartStage 
-								?? throw new Exception("No start stage at pipeline");
+								?? (needStartStage ? throw new Exception("No start stage at pipeline") : null);
 
 			// Строим методы вызовов следующих этапов с конца
 			var last            = _stages.Count-1;
 			Action<object> next	= _final!=null						 ? _final.Finalize
 								: last<0 && start is IFinalStage fin ? fin.Finalize
-								: last<0 && this  is IFinalStage plf ? plf.Finalize
 								: throw new Exception("No final stage at pipeline");
 			
 			// Промежуточные этапы
@@ -85,7 +91,9 @@ namespace Dm.Web.BuildStatic.Services
 			}
 
 			// Запускаем с начального этапа
-			start.Run(next);
+			return start==null
+				 ? (p) => next(p)
+				 : (p) => start.Run(next);
 		}
 
 		private static Action<object> _buildNextFx(IStage stage, Action<object> next)

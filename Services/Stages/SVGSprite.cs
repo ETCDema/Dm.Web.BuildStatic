@@ -18,7 +18,7 @@ internal class SVGSprite(string dstName) : IFinalStage, IStage
 		/// </summary>
 		/// <param name="cfg">Имя SVG Sprite файла.</param>
 		/// <param name="dst">Создаваемый конвейер</param>
-		public void Build(JsonElement cfg, Pipeline dst)
+		public void Build(JsonElement cfg, PipelineBuilder dst)
 		{
 			dst.Add(new SVGSprite(cfg.GetString()!));
 		}
