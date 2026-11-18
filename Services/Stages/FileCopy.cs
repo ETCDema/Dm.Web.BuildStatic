@@ -9,9 +9,11 @@ namespace Dm.Web.BuildStatic.Services.Stages;
 /// Копирование из существующего файла в новый. Если новый файл существует и исходный файл старше нового копирование выполняться не будет.
 /// </summary>
 /// <remarks>Если этап последний, то он просто копирует содержимое, если нет - открывает и передает потоки следующему этапу в <see cref="InOutStreams"/>.</remarks>
-/// <param name="nameTemplate">Шаблон имени нового файла</param>
-internal class FileCopy(string nameTemplate, Action<object>? fx) : IStage, IFinalStage
+internal class FileCopy : IStage, IFinalStage
 {
+	private readonly string _nameTemplate;
+	private readonly Pipeline? _pipeline;
+
 	/// <summary>
 	/// Создать этап копирования. Параметр конфигурации - шаблон имени нового файла, может содержать:
 	/// <list type="bullet">
@@ -19,41 +21,24 @@ internal class FileCopy(string nameTemplate, Action<object>? fx) : IStage, IFina
 	/// <item><c>{file}</c> - подстановка исходного имени с расширением файла</item>
 	/// </list>
 	/// </summary>
-	public class Builder : IStageBuilder
+	/// <param name="cfg">Параметры этапа</param>
+	public FileCopy(JsonElement cfg, StageProvider builders)
 	{
-		/// <inheritdoc cref="Builder"/>
-		/// <param name="cfg">Строка - шаблон имени нового файла</param>
-		/// <param name="dst">Создаваемый конвейер</param>
-		public void Build(JsonElement cfg, PipelineBuilder dst)
+		var stages				= new List<JsonProperty>();
+
+		foreach (var prop in cfg.EnumerateObject())
 		{
-			var nameTemplate    = default(string);
-			var nestedBuilder   = default(PipelineBuilder);
-
-			foreach (var prop in cfg.EnumerateObject())
-			{
-				var propName    = prop.Name;
-
-				if (propName=="@dst")
-				{
-					nameTemplate= prop.Value.GetString();
-				} else
-				{
-					var builder = dst.TryGetBuilder(propName)
-								?? throw new Exception($"Builder {propName} not found");
-
-					nestedBuilder       ??= new PipelineBuilder(typeof(InOutStreams), dst.TryGetBuilder);
-					builder.Build(prop.Value, nestedBuilder);
-				}
-			}
-
-			if (string.IsNullOrEmpty(nameTemplate)) throw new Exception("Destination file name not specified");
-
-			dst.Add(Build(nameTemplate, nestedBuilder?.Build()));
+			if (prop.Name=="@dst")
+				_nameTemplate	= prop.Value.GetString()!;
+			else
+				stages.Add(prop);
 		}
 
-		protected virtual FileCopy Build(string nameTemplate, Action<object>? fx)
+		if (string.IsNullOrEmpty(_nameTemplate)) throw new Exception("Destination file name not specified");
+
+		if (0<stages.Count)
 		{
-			return new FileCopy(nameTemplate, fx);
+			_pipeline			= new Pipeline("FileCopy", typeof(InOutStreams), stages, builders);
 		}
 	}
 
@@ -75,7 +60,7 @@ internal class FileCopy(string nameTemplate, Action<object>? fx) : IStage, IFina
 
 	protected string DstName(string srcName)
 	{
-		return nameTemplate.Replace("{path}", srcName)
+		return _nameTemplate.Replace("{path}", srcName)
 						   .Replace("{path-no-ext}", _pathNoExt(srcName))
 						   .Replace("{file}", Path.GetFileName(srcName))
 						   .Replace("{file-no-ext}", Path.GetFileNameWithoutExtension(srcName));
@@ -92,18 +77,28 @@ internal class FileCopy(string nameTemplate, Action<object>? fx) : IStage, IFina
 		}
 		using var input         = File.OpenRead(srcName);
 		using var output		= File.Create(dstName);
-		if (fx!=null)
+
+		try
 		{
-			fx(new InOutStreams
+			if (_pipeline!=null)
 			{
-				In              = input,
-				InName          = input.Name,
-				Out             = output,
-				OutName         = output.Name
-			});
-		} else
+				_pipeline.Run(new InOutStreams
+				{
+					In              = input,
+					InName          = input.Name,
+					Out             = output,
+					OutName         = output.Name
+				});
+			} else
+			{
+				input.CopyTo(output);
+				Console.WriteLine($"✅ Copy {input.Name} -> {output.Name}");
+			}
+		} catch
 		{
-			input.CopyTo(output);
+			output.Dispose();
+			try { File.Delete(dstName); } catch { }
+			throw;
 		}
 
 		output.Close();

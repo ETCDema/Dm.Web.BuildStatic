@@ -1,16 +1,10 @@
-﻿namespace Dm.Web.BuildStatic.Services.Stages
-{
-	internal class EachFileCopy(string nameTemplate, Action<object>? fx)
-		: FileCopy(nameTemplate, fx)
-	{
-		public new class Builder: FileCopy.Builder
-		{
-			protected override FileCopy Build(string nameTemplate, Action<object>? fx)
-			{
-				return new EachFileCopy(nameTemplate, fx);
-			}
-		}
+﻿using System.Text.Json;
 
+namespace Dm.Web.BuildStatic.Services.Stages
+{
+	internal class EachFileCopy(JsonElement cfg, StageProvider builders)
+		: FileCopy(cfg, builders)
+	{
 		public override Type ParamType	=> typeof(IEnumerable<string>);
 
 		public override Type ResultType => typeof(IEnumerable<string>);

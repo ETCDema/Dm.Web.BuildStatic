@@ -10,20 +10,19 @@ namespace Dm.Web.BuildStatic.Services.Stages
 	/// Сжать данные из потока для чтения в поток для записи
 	/// </summary>
 	/// <param name="level">Уровень сжатия</param>
-	internal class GzipStream(CompressionLevel level): IFinalStage, IStage
+	internal class GzipStream: IFinalStage, IStage
 	{
-		public class Builder : IStageBuilder
+		private readonly CompressionLevel _level;
+
+		/// <summary>
+		/// Создать этап. Параметр конфигурации - уровень сжатия <see cref="CompressionLevel"/>.
+		/// </summary>
+		/// <param name="cfg">Строка - уровень сжатия, возможные значения см. тут <see cref="CompressionLevel"/>. Если не указан, то используется <see cref="CompressionLevel.Optimal"/>.</param>
+		/// <param name="dst">Создаваемый конвейер</param>
+		public GzipStream(JsonElement cfg, StageProvider builders)
 		{
-			/// <summary>
-			/// Создать этап. Параметр конфигурации - уровень сжатия <see cref="CompressionLevel"/>.
-			/// </summary>
-			/// <param name="cfg">Строка - уровень сжатия, возможные значения см. тут <see cref="CompressionLevel"/>. Если не указан, то используется <see cref="CompressionLevel.Optimal"/>.</param>
-			/// <param name="dst">Создаваемый конвейер</param>
-			public void Build(JsonElement cfg, PipelineBuilder dst)
-			{
-				var level       = cfg.GetString();
-				dst.Add(new GzipStream(string.IsNullOrEmpty(level) ? CompressionLevel.Optimal : Enum.Parse<CompressionLevel>(level)));
-			}
+			var level			= cfg.GetString();
+			_level				= string.IsNullOrEmpty(level) ? CompressionLevel.Optimal : Enum.Parse<CompressionLevel>(level);
 		}
 
 		/// <inheritdoc/>
@@ -34,7 +33,7 @@ namespace Dm.Web.BuildStatic.Services.Stages
 		public void Finalize(object param)
 		{
 			var streams			= (InOutStreams)param;
-			using var gzip		= new GZipStream(streams.Out, level);
+			using var gzip		= new GZipStream(streams.Out, _level);
 			streams.In.CopyTo(gzip);
 
 			Console.WriteLine($"✅ Gzip {streams.InName} -> {streams.OutName}");
@@ -48,7 +47,7 @@ namespace Dm.Web.BuildStatic.Services.Stages
 		void IStage.Run(object param, Action<object> next)
 		{
 			var streams         = (InOutStreams)param;
-			using var gzip      = new GZipStream(streams.Out, level);
+			using var gzip      = new GZipStream(streams.Out, _level);
 
 			Console.WriteLine($"✅ Out {streams.OutName} is GZIP");
 			next(new InOutStreams

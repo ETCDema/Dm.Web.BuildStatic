@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Security.Cryptography;
+using System.Text.Json;
 
 using Dm.Web.BuildStatic.Services.Core;
 
@@ -8,27 +9,23 @@ namespace Dm.Web.BuildStatic.Services.Stages;
 /// Получить коллекцию файлов из указанной директории.
 /// </summary>
 /// <remarks>Если этап не первый, то он дополнит коллекцию с предыдущего этапа.</remarks>
-internal class FilesSource(string directory, string pattern, bool recursive) : IStartStage, IStage
+internal class FilesSource : IStartStage, IStage
 {
+	private readonly string _directory;
+	private readonly string _pattern;
+	private readonly bool _recursive;
+
 	/// <summary>
 	/// Создать этап. Параметр конфигурации - относительный/абсолютный путь к директории с файлами + паттерн фильтрации файлов. Если перет паттерном содержит сегмент <c>**</c>, то будут просмотрены все вложенные папки.
 	/// </summary>
-	public class Builder : IStageBuilder
+	public FilesSource(JsonElement cfg, StageProvider builders)
 	{
-		/// <inheritdoc cref="Builder"/>
-		/// <param name="cfg">Строка - относительный/абсолютный путь к директории с файлами + паттерн фильтрации файлов</param>
-		/// <param name="dst">Создаваемый конвейер</param>
-		public void Build(JsonElement cfg, PipelineBuilder dst)
-		{
-			var segments		= cfg.GetString()?.Split(Path.PathSeparator, Path.AltDirectorySeparatorChar);
-			if (segments==null || segments.Length==0) throw new ArgumentException("Empty path+pattern for FilesSource");
+		var segments			= cfg.GetString()?.Split(Path.PathSeparator, Path.AltDirectorySeparatorChar);
+		if (segments==null || segments.Length==0) throw new ArgumentException("Empty path+pattern for FilesSource");
 
-			var pattern         = segments[segments.Length-1];
-			var recursive       = 2<=segments.Length && segments[segments.Length-2]=="**";
-			var directory		= string.Join(Path.DirectorySeparatorChar, segments, 0, segments.Length-(recursive ? 2 : 1));
-
-			dst.Add(new FilesSource(directory, pattern, recursive));
-		}
+		_pattern				= segments[segments.Length-1];
+		_recursive				= 2<=segments.Length && segments[segments.Length-2]=="**";
+		_directory				= string.Join(Path.DirectorySeparatorChar, segments, 0, segments.Length-(_recursive ? 2 : 1));
 	}
 
 	/// <inheritdoc/>
@@ -42,8 +39,8 @@ internal class FilesSource(string directory, string pattern, bool recursive) : I
 
 	private IEnumerable<string> _getFiles()
 	{
-		return Directory.Exists(directory)
-			 ? Directory.EnumerateFiles(directory, pattern, new EnumerationOptions { RecurseSubdirectories = recursive })
+		return Directory.Exists(_directory)
+			 ? Directory.EnumerateFiles(_directory, _pattern!, new EnumerationOptions { RecurseSubdirectories = _recursive })
 			 : [];
 	}
 

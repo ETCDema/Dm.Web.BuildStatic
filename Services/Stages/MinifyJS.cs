@@ -11,21 +11,15 @@ namespace Dm.Web.BuildStatic.Services.Stages;
 /// <summary>
 /// Минимизация JS
 /// </summary>
-internal class MinifyJS : IFinalStage, IStage
+/// <remarks>
+/// Создать этап.
+/// </remarks>
+/// <param name="cfg">Игнорируется.</param>
+/// <param name="builders">Игнорируется.</param>
+#pragma warning disable CS9113 // Параметр не прочитан.
+internal class MinifyJS(JsonElement cfg, StageProvider builders) : IFinalStage, IStage
+#pragma warning restore CS9113 // Параметр не прочитан.
 {
-	public class Builder : IStageBuilder
-	{
-		/// <summary>
-		/// Создать этап.
-		/// </summary>
-		/// <param name="cfg">Игнорируется.</param>
-		/// <param name="dst">Создаваемый конвейер</param>
-		public void Build(JsonElement cfg, PipelineBuilder dst)
-		{
-			dst.Add(new MinifyJS());
-		}
-	}
-
 	private readonly CodeSettings _opt	= new(){ OutputMode = OutputMode.MultipleLines, Indent = "" };
 
 	/// <inheritdoc/>
@@ -43,10 +37,11 @@ internal class MinifyJS : IFinalStage, IStage
 		if (_isMinified(streams.InName))
 		{
 			next(param);
+			Console.WriteLine($"⏭️ {streams.InName} already minified");
 		} else
 		{
 			using var dst       = new MemoryStream();
-			_minify(streams.In, dst);
+			_minify(streams.InName, streams.In, dst);
 			dst.Position        = 0;
 			next(new InOutStreams
 			{
@@ -55,6 +50,7 @@ internal class MinifyJS : IFinalStage, IStage
 				Out             = streams.Out,
 				OutName         = streams.OutName
 			});
+			Console.WriteLine($"✅ {streams.InName} minified");
 		}
 	}
 
@@ -64,9 +60,14 @@ internal class MinifyJS : IFinalStage, IStage
 	{
 		var streams             = (InOutStreams)param;
 		if (_isMinified(streams.InName))
+		{
 			streams.In.CopyTo(streams.Out);
-		else
-			_minify(streams.In, streams.Out);
+			Console.WriteLine($"⏭️ {streams.InName} already minified -> {streams.OutName}");
+		} else
+		{
+			_minify(streams.InName, streams.In, streams.Out);
+			Console.WriteLine($"✅ {streams.InName} minified -> {streams.OutName}");
+		}
 	}
 
 	private static bool _isMinified(string name)
@@ -78,11 +79,14 @@ internal class MinifyJS : IFinalStage, IStage
 		return minExt!=null && name.EndsWith(minExt, StringComparison.OrdinalIgnoreCase);
 	}
 
-	private void _minify(Stream src, Stream dst)
+	private void _minify(string inName, Stream src, Stream dst)
 	{
 		using var reader		= new StreamReader(src);
 		var js					= reader.ReadToEnd();
 		var minJS               = Uglify.Js(js, _opt);
+
+		if (minJS.HasErrors)
+			throw new Exception($"❌ Minify {inName} FAIL:\n\t{string.Join(";\n\t", minJS.Errors)}");
 
 		using var writer		= new StreamWriter(dst, leaveOpen: true);
 		writer.Write(minJS);

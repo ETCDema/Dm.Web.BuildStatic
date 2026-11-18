@@ -1,10 +1,11 @@
 ﻿{
+    "parallel": false,
     "use": {
-        "list":     "Dm.Web.BuildStatic.Services.Stages.FilesSource+Builder",
-        "eachFile": "Dm.Web.BuildStatic.Services.Stages.EachFileCopy+Builder",
-        "minjs":    "Dm.Web.BuildStatic.Services.Stages.MinifyJS+Builder",
-        "gzip":     "Dm.Web.BuildStatic.Services.Stages.GzipStream+Builder",
-		"sprite":   "Dm.Web.BuildStatic.Services.Stages.SVGSprite+Builder"
+        "list":     "Dm.Web.BuildStatic.Services.Stages.FilesSource",
+        "eachFile": "Dm.Web.BuildStatic.Services.Stages.EachFileCopy",
+        "minjs":    "Dm.Web.BuildStatic.Services.Stages.MinifyJS",
+        "gzip":     "Dm.Web.BuildStatic.Services.Stages.GzipStream",
+		"sprite":   "Dm.Web.BuildStatic.Services.Stages.SVGSprite"
     },
     "pipelines": [
         {

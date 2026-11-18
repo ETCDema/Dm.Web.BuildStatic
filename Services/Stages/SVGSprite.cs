@@ -9,19 +9,17 @@ namespace Dm.Web.BuildStatic.Services.Stages;
 /// <summary>
 /// Упаковка SVG файлов в один SVG Sprite файл.
 /// </summary>
-internal class SVGSprite(string dstName) : IFinalStage, IStage
+internal class SVGSprite : IFinalStage, IStage
 {
-	public class Builder : IStageBuilder
+	private readonly string _dstName;
+
+	/// <summary>
+	/// Создать этап.
+	/// </summary>
+	/// <param name="cfg">Имя SVG Sprite файла.</param>
+	public SVGSprite(JsonElement cfg, StageProvider builders)
 	{
-		/// <summary>
-		/// Создать этап.
-		/// </summary>
-		/// <param name="cfg">Имя SVG Sprite файла.</param>
-		/// <param name="dst">Создаваемый конвейер</param>
-		public void Build(JsonElement cfg, PipelineBuilder dst)
-		{
-			dst.Add(new SVGSprite(cfg.GetString()!));
-		}
+		_dstName				= cfg.GetString()!;
 	}
 
 	/// <inheritdoc/>
@@ -38,7 +36,7 @@ internal class SVGSprite(string dstName) : IFinalStage, IStage
 		if (_maySkip(src)) return;
 
 		using var input 		= new MemoryStream();
-		using var output 		= File.Create(dstName);
+		using var output 		= File.Create(_dstName);
 		_buildSVG(src, input);
 		input.Position 			= 0;
 		next(new InOutStreams
@@ -57,7 +55,7 @@ internal class SVGSprite(string dstName) : IFinalStage, IStage
 		var src 				= new List<string>((IEnumerable<string>)param);
 		if (_maySkip(src)) return;
 
-		using var output 		= File.Create(dstName);
+		using var output 		= File.Create(_dstName);
 		_buildSVG(src, output);
 		Console.WriteLine($"✅ Symbols[{src.Count}] -> {output.Name}");
 	}
@@ -66,20 +64,20 @@ internal class SVGSprite(string dstName) : IFinalStage, IStage
 	{
 		if (src.Count == 0)
 		{
-			Console.WriteLine($"⚠️ The collection of SVG symbol files is empty - cannot build SVG sprite {dstName}");
+			Console.WriteLine($"⚠️ The collection of SVG symbol files is empty - cannot build SVG sprite {_dstName}");
 			return true;
 		}
 
-		if (!File.Exists(dstName)) return false;
+		if (!File.Exists(_dstName)) return false;
 
-		var dstMod 				= File.GetLastWriteTimeUtc(dstName);
+		var dstMod 				= File.GetLastWriteTimeUtc(_dstName);
 		foreach (var svg in src)
 		{
 			var srcMod 			= File.GetLastWriteTimeUtc(svg);
 			if (dstMod < srcMod) return false;
 		}
 
-		Console.WriteLine($"⏭️ Symbols[{src.Count}] -> {dstName} SKIPPED");
+		Console.WriteLine($"⏭️ Symbols[{src.Count}] -> {_dstName} SKIPPED");
 
 		return true;
 	}

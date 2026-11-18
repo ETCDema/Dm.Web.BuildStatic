@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 
 using Dm.Web.BuildStatic.Services;
@@ -8,6 +9,8 @@ namespace Dm.Web.BuildStatic;
 internal class Program
 {
 	private static readonly string _DEFAULT_CFG_NAME	= "dm.web.build.static.json";
+
+	private static int _returnCode		= 0;
 
 	static int Main(string[] args)
 	{
@@ -33,31 +36,44 @@ internal class Program
 
 			Console.WriteLine($"🛠️ Pre-build static resources using config file {cfgName}...");
 
-			var builders        = new Dictionary<string, IStageBuilder>();
-			var pipelines       = new List<PipelineBuilder>();
-
-			IStageBuilder? tryGetBuilder(string name)
-			{
-				return builders.TryGetValue(name, out var builder) ? builder : null;
-			}
+			var timer           = Stopwatch.StartNew();
+			var builders        = new StageProvider();
+			var pipelines       = new List<Pipeline>();
+			var parallel        = true;
 
 			foreach (var prop in config.EnumerateObject())
 			{
 				switch (prop.Name)
 				{
-					case "use": _readBuilders(prop.Value, builders); break;
-					case "pipelines": _readPipelines(prop.Value, builders, pipelines, tryGetBuilder); break;
-					default: throw new NotSupportedException($"Property {prop.Name} at root not supported");
+					case "parallel":	parallel = prop.Value.GetBoolean(); break;
+					case "use":			builders.Configure(prop.Value); break;
+					case "pipelines":	_readPipelines(prop.Value, builders, pipelines); break;
+					default:			throw new NotSupportedException($"Property {prop.Name} at root not supported");
 				}
 			}
 
-			tryReadConfig       = false;
-
-			// Запускаем конвейеры параллельно
-			var pipelineFxs     = pipelines.Select(p => p.Build());
-			Parallel.ForEach(pipelineFxs, fx => fx(null!));
-
-			Console.WriteLine($"✔️ Done");
+			tryReadConfig		= false;
+			
+			if (pipelines.Count==0)
+			{
+				Console.WriteLine($"🚫 No pipelines");
+			} else if (parallel)
+			{
+				// Запускаем конвейеры параллельно
+				Parallel.ForEach(pipelines, _safeRun);
+				timer.Stop();
+				Console.WriteLine($"✔️ Done {timer.Elapsed}");
+			} else
+			{
+				// Запускаем конвейеры последовательно
+				foreach (var pipeline in pipelines)
+				{
+					Console.WriteLine($"⌛ {pipeline.ID}...");
+					_safeRun(pipeline);
+				}
+				timer.Stop();
+				Console.WriteLine($"✔️ Done {timer.Elapsed}");
+			}
 
 			// Отпускаем файл...
 			reader.Close();
@@ -67,39 +83,32 @@ internal class Program
 				_waitForCompletion(cfgName);
 			else
 			{
-				Console.WriteLine($"HResult: {ex.HResult}");
+				Console.WriteLine($"❌ HResult: {ex.HResult}");
 				throw;
 			}
 		}
 
-		return 0;
+		return _returnCode;
 	}
 
-	private static void _readBuilders(JsonElement cfg, Dictionary<string, IStageBuilder> builders)
+	private static void _safeRun(Pipeline pipeline)
 	{
-		foreach (var prop in cfg.EnumerateObject())
+		try
 		{
-			var type			= Type.GetType(prop.Value.GetString()!, true)!;
-			builders.Add(prop.Name, (IStageBuilder)Activator.CreateInstance(type)!);
+			pipeline.Run(null!);
+		} catch (Exception ex)
+		{
+			Console.WriteLine($"🛑 Pipeline {pipeline.ID} FAIL: {ex.Message}");
+			Interlocked.CompareExchange(ref _returnCode, 2, 0);
 		}
 	}
 
-	private static void _readPipelines(JsonElement value, Dictionary<string, IStageBuilder> builders, List<PipelineBuilder> pipelines, Func<string, IStageBuilder?> tryGetBuilder)
+	private static void _readPipelines(JsonElement value, StageProvider builders, List<Pipeline> pipelines)
 	{
+		var i					= 1;
 		foreach (var item in value.EnumerateArray())
 		{
-			var pipeline        = new PipelineBuilder(null, tryGetBuilder);
-			_readPipeline(item, builders, pipeline);
-			pipelines.Add(pipeline);
-		}
-	}
-
-	private static void _readPipeline(JsonElement cfg, Dictionary<string, IStageBuilder> builders, PipelineBuilder pipeline)
-	{
-		foreach (var prop in cfg.EnumerateObject())
-		{
-			var builder         = builders[prop.Name];
-			builder.Build(prop.Value, pipeline);
+			pipelines.Add(new Pipeline($"Main[{i++}]", null, item.EnumerateObject(), builders));
 		}
 	}
 
