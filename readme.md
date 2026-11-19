@@ -40,11 +40,12 @@ Pre-build step:
 {
     "parallel": true,
     "use": {
-        "list":     "Dm.Web.BuildStatic.Services.Stages.FilesSource",
-        "eachFile": "Dm.Web.BuildStatic.Services.Stages.EachFileCopy",
-        "minjs":    "Dm.Web.BuildStatic.Services.Stages.MinifyJS",
-        "gzip":     "Dm.Web.BuildStatic.Services.Stages.GzipStream",
-		"sprite":   "Dm.Web.BuildStatic.Services.Stages.SVGSprite"
+        "list":     "Dm.Web.BuildStatic.Stages.Files.FilesSource",
+        "eachFile": "Dm.Web.BuildStatic.Stages.Files.EachFileCopy",
+        "minjs":    "Dm.Web.BuildStatic.Stages.JS.MinifyJS",
+        "gzip":     "Dm.Web.BuildStatic.Stages.Compress.GzipStream",
+		"sprite":   "Dm.Web.BuildStatic.Stages.SVG.SVGSprite",
+        "svg2mjs":  "Dm.Web.BuildStatic.Stages.SVG.SVGtoJS"
     },
     "pipelines": [
         {
@@ -73,8 +74,9 @@ Pre-build step:
         },
         {
             "list":   "TestStatic/img/oauth2-icons/*.svg",
-			"sprite": "TestStatic/img/oauth2-icons.svg.gz",
-			"gzip":   null
+			"sprite": "TestStatic/img/oauth2-icons.mjs.gz",
+			"gzip":    null,
+            "svg2mjs": null
         }
     ]
 }
@@ -91,9 +93,10 @@ Optional parameter:
 
 ## Built-in Pipeline Stages
 
-1. **`Dm.Web.BuildStatic.Services.Stages.FilesSource`** - enumerates files in a folder. Requires a `"folder+pattern"` parameter (e.g., `"js/*.js"` for all JS files in the `js` folder, `"js/**/*.js"` for JS files in the `js` folder and its subfolders).
-2. **`Dm.Web.BuildStatic.Services.Stages.EachFileCopy`** - copies a files from `src` collection (provided by the previous stage) to `@dst` (required parameter).
-3. **`Dm.Web.BuildStatic.Services.Stages.FileCopy`** - copies a one file from `src` (provided by the previous stage) to `@dst` (required parameter).
-4. **`Dm.Web.BuildStatic.Services.Stages.MinifyJS`** - minifies a JS file using Uglify. Accepts an `InOutStreams` model with source JS and outputs `InOutStreams` with minified JS in `InOutStreams.In`. If this is the final stage, saves the minified content to `InOutStreams.Out`.
-5. **`Dm.Web.BuildStatic.Services.Stages.GzipStream`** - compresses the incoming `InOutStreams.In` stream to `InOutStreams.Out` using GZIP.
-6. **`Dm.Web.BuildStatic.Services.Stages.SVGSprite`** - combines an incoming collection of SVG symbol files into a sprite. Requires a `dst` parameter (output destination).
+1. **`Dm.Web.BuildStatic.Stages.Files.FilesSource`** - enumerates files in a folder. Requires a `"folder+pattern"` parameter (e.g., `"js/*.js"` for all JS files in the `js` folder, `"js/**/*.js"` for JS files in the `js` folder and its subfolders).
+2. **`Dm.Web.BuildStatic.Stages.Files.EachFileCopy`** - copies a files from `src` collection (provided by the previous stage) to `@dst` (required parameter).
+3. **`Dm.Web.BuildStatic.Stages.Files.FileCopy`** - copies a one file from `src` (provided by the previous stage) to `@dst` (required parameter).
+4. **`Dm.Web.BuildStatic.Stages.JS.MinifyJS`** - minifies a JS file using Uglify. Accepts an `InOutStreams` model with source JS and outputs `InOutStreams` with minified JS in `InOutStreams.In`. If this is the final stage, saves the minified content to `InOutStreams.Out`.
+5. **`Dm.Web.BuildStatic.Stages.Compress.GzipStream`** - compresses the incoming `InOutStreams.In` stream to `InOutStreams.Out` using GZIP.
+6. **`Dm.Web.BuildStatic.Stages.SVG.SVGSprite`** - combines an incoming collection of SVG symbol files into a sprite. Requires a `dst` parameter (output destination).
+7. **`Dm.Web.BuildStatic.Stages.SVG.SVGtoJS`** - build a JS module file for add SVG to `document.head`. Accepts an `InOutStreams` model with source SVG and outputs `InOutStreams` with ready JS in `InOutStreams.In`. If this is the final stage, saves the JS to `InOutStreams.Out`.
