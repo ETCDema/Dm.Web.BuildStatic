@@ -1,11 +1,12 @@
 ﻿{
-    "parallel": true,
+    "parallel": false,
     "use": {
-        "list":     "Dm.Web.BuildStatic.Services.Stages.FilesSource",
-        "eachFile": "Dm.Web.BuildStatic.Services.Stages.EachFileCopy",
-        "minjs":    "Dm.Web.BuildStatic.Services.Stages.MinifyJS",
-        "gzip":     "Dm.Web.BuildStatic.Services.Stages.GzipStream",
-		"sprite":   "Dm.Web.BuildStatic.Services.Stages.SVGSprite"
+        "list":     "Dm.Web.BuildStatic.Stages.Files.FilesSource",
+        "eachFile": "Dm.Web.BuildStatic.Stages.Files.EachFileCopy",
+        "minjs":    "Dm.Web.BuildStatic.Stages.JS.MinifyJS",
+        "gzip":     "Dm.Web.BuildStatic.Stages.Compress.GzipStream",
+		"sprite":   "Dm.Web.BuildStatic.Stages.SVG.SVGSprite",
+        "svg2mjs":  "Dm.Web.BuildStatic.Stages.SVG.SVGtoJS"
     },
     "pipelines": [
         {
@@ -34,8 +35,9 @@
         },
         {
             "list":   "TestStatic/img/oauth2-icons/*.svg",
-			"sprite": "TestStatic/img/oauth2-icons.svg.gz",
-			"gzip":   null
+			"sprite": "TestStatic/img/oauth2-icons.mjs.gz",
+			"gzip":    null,
+            "svg2mjs": null
         }
     ]
 }

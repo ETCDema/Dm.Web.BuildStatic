@@ -1,9 +1,10 @@
 ﻿using System.Text.Json;
 
 using Dm.Web.BuildStatic.Models;
-using Dm.Web.BuildStatic.Services.Core;
+using Dm.Web.BuildStatic.Services;
+using Dm.Web.BuildStatic.Stages.Core;
 
-namespace Dm.Web.BuildStatic.Services.Stages;
+namespace Dm.Web.BuildStatic.Stages.Files;
 
 /// <summary>
 /// Копирование из существующего файла в новый. Если новый файл существует и исходный файл старше нового копирование выполняться не будет.

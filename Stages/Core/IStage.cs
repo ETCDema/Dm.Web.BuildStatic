@@ -1,4 +1,4 @@
-﻿namespace Dm.Web.BuildStatic.Services.Core;
+﻿namespace Dm.Web.BuildStatic.Stages.Core;
 
 /// <summary>
 /// Промежуточный этап конвейера

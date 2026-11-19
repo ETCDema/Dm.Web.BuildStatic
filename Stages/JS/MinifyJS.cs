@@ -1,12 +1,13 @@
 ﻿using System.Text.Json;
 
 using Dm.Web.BuildStatic.Models;
-using Dm.Web.BuildStatic.Services.Core;
+using Dm.Web.BuildStatic.Services;
+using Dm.Web.BuildStatic.Stages.Core;
 
 using NUglify;
 using NUglify.JavaScript;
 
-namespace Dm.Web.BuildStatic.Services.Stages;
+namespace Dm.Web.BuildStatic.Stages.JS;
 
 /// <summary>
 /// Минимизация JS
@@ -43,6 +44,7 @@ internal class MinifyJS(JsonElement cfg, StageProvider builders) : IFinalStage, 
 			using var dst       = new MemoryStream();
 			_minify(streams.InName, streams.In, dst);
 			dst.Position        = 0;
+			Console.WriteLine($"✅ {streams.InName} minified");
 			next(new InOutStreams
 			{
 				In              = dst,
@@ -50,7 +52,6 @@ internal class MinifyJS(JsonElement cfg, StageProvider builders) : IFinalStage, 
 				Out             = streams.Out,
 				OutName         = streams.OutName
 			});
-			Console.WriteLine($"✅ {streams.InName} minified");
 		}
 	}
 

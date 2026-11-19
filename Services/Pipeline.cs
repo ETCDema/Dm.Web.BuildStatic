@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 
-using Dm.Web.BuildStatic.Services.Core;
+using Dm.Web.BuildStatic.Stages.Core;
 
 namespace Dm.Web.BuildStatic.Services
 {

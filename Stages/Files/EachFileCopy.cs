@@ -1,6 +1,8 @@
 ﻿using System.Text.Json;
 
-namespace Dm.Web.BuildStatic.Services.Stages
+using Dm.Web.BuildStatic.Services;
+
+namespace Dm.Web.BuildStatic.Stages.Files
 {
 	internal class EachFileCopy(JsonElement cfg, StageProvider builders)
 		: FileCopy(cfg, builders)

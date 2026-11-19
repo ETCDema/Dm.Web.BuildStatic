@@ -1,9 +1,10 @@
 ﻿using System.Security.Cryptography;
 using System.Text.Json;
 
-using Dm.Web.BuildStatic.Services.Core;
+using Dm.Web.BuildStatic.Services;
+using Dm.Web.BuildStatic.Stages.Core;
 
-namespace Dm.Web.BuildStatic.Services.Stages;
+namespace Dm.Web.BuildStatic.Stages.Files;
 
 /// <summary>
 /// Получить коллекцию файлов из указанной директории.
