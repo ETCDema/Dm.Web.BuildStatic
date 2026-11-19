@@ -4,9 +4,11 @@
         "list":     "Dm.Web.BuildStatic.Stages.Files.FilesSource",
         "eachFile": "Dm.Web.BuildStatic.Stages.Files.EachFileCopy",
         "minjs":    "Dm.Web.BuildStatic.Stages.JS.MinifyJS",
+        "minjssrc": "Dm.Web.BuildStatic.Stages.JS.MinifyJSSource",
         "gzip":     "Dm.Web.BuildStatic.Stages.Compress.GzipStream",
 		"sprite":   "Dm.Web.BuildStatic.Stages.SVG.SVGSprite",
-        "svg2mjs":  "Dm.Web.BuildStatic.Stages.SVG.SVGtoJS"
+        "svg2mjs":  "Dm.Web.BuildStatic.Stages.SVG.SVGtoJS",
+        "vue2mjs":  "Dm.Web.BuildStatic.Stages.JS.VueToJS"
     },
     "pipelines": [
         {
@@ -16,6 +18,16 @@
                 "@dst":  "{path}.gz",
                 "gzip":  "Optimal",
                 "minjs": null
+            }
+        },
+        {
+            "list":  "TestStatic/vue/*.vue",
+            "eachFile": {
+                "@dst":    "{path}.mjs.gz",
+                "gzip":    null,
+                "vue2mjs": {
+                    "js":  "minjssrc"
+                }
             }
         },
         {
