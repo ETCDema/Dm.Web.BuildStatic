@@ -91,7 +91,7 @@ namespace Dm.Web.BuildStatic.Stages.JS
 
 		private bool _isJSType(string? type)
 		{
-			return type=="text/javascript" || type==null;
+			return type=="text/javascript" || type=="module" || type==null;
 		}
 
 		private static void _writeJS(_vue vue, StreamWriter writer)
