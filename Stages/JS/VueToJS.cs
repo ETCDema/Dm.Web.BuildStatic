@@ -86,7 +86,7 @@ namespace Dm.Web.BuildStatic.Stages.JS
 
 		private bool _isTemplateType(string? type)
 		{
-			return type=="text/html" || type=="text/plain";
+			return type=="text/html" || type=="text/plain" || type=="text/x-template";
 		}
 
 		private bool _isJSType(string? type)
